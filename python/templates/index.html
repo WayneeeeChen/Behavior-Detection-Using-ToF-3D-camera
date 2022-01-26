@@ -1,0 +1,35 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head> 
+    <meta charset="utf-8">
+    <meta name="description" content="Falling detect">
+    <meta name="keywords" content="HTML,CSS,JavaScript">
+    <meta name="author" content="HugoLiu">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIS跌倒偵測暨床邊照護</title>
+  </head>
+  <body>
+    <h1><img src="{{ url_for('static', filename='logo.png') }}" />  跌倒偵測暨床邊照護</h1>
+    <hr>
+    <from>
+    <img width: 640px; src="{{ url_for('video_feed') }}">
+    </from>
+    
+     <form method='post' action="{{ url_for('submit') }}">
+     <label for ="html_fun">功能</label>
+      <select id="html_fun" name='html_fun'>     
+        <option value = ""></option>
+        <option value = "x_initial">初始值設定</option>
+        <option value = "x_go">運行</option>
+        <option value = "x_stop">暫停</option>
+        <option value = "x_reboot">重啟</option>
+      </select>
+      <label> 現在狀態: {{Go_html}}  </label>  
+      <br>
+      <label> TOF_SN: {{Tof_SN}} </label>
+     <p><button type='submit'>執行</button></p>
+    </form>
+
+    <!--a href=”/y_initial”><input type=”button” value=”初始值設定”></a> --> 
+  </body>
+</html>
