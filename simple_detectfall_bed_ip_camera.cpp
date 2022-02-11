@@ -107,6 +107,10 @@
 
 #define WIDTH_TH     25
 #define BED_LENGTH   50
+#define BigChangeThresh 15  //20220208
+#define Standthreshold 20 //20220208
+#define StandAreathresh 40 //20220208
+
 
 //#define IMAGE_INIT
 //#define IMAGE_MASK
@@ -1342,13 +1346,20 @@ int main(int argc, char* argv[])
     bool singal_person = 0;
     bool max_high_less_240 = 0;
     //20220120
-    bool EdgeStatus = false; //2022 "To distinct the behavior of "UP" and "Edge"
-    int HumanOnEdgeLineCount = 0; //2022 To Count How Many Times Human On Edge
-    int GroundAvgUpPixel = 0; //2022 
-    int GroundAvgDownPixel = 0; //2022
-    //int Pre_AvgPixel_Inbed = 0;//2022 To improve the object leaving in bed by human
-    bool bed_obj_status = false; //20220126
-    int bed_status = 0; //20220126
+    bool EdgeStatus = false; // "To distinct the behavior of "UP" and "Edge"
+    int HumanOnUpEdgeLineCount = 0; // To Count How Many Times Human On Edge
+    int HumanOnDownEdgeLineCount = 0;
+    int GroundAvgUpPixel = 0; 
+    int GroundAvgDownPixel = 0; 
+    bool bed_obj_change_status = false; 
+    int bed_status = 0; 
+    //20220208
+    int BedAvgPixel = 0; 
+    bool StandAroundBed = false;  // To Judge Stand around bed or not
+    int WholeUpArea = 0; 
+    int WholeUpAvgPixel = 0;
+    int WholeDownArea = 0;
+    int WholeDownAvgPixel = 0;
 
 #ifdef    SHOW_MULTI_PEOPLE
     int people_number = 0;
@@ -2896,11 +2907,7 @@ int main(int argc, char* argv[])
                 //if (col_high < 15) no_bed = 1;
                 printf("The col result first line %d and width %d and last %d and depth %d\n", col_first_line
                     , col_width, col_end_line, col_high);
-                /*
-                                if ((bed_width > (WIDTH_TH + 15)) || (bed_width < WIDTH_TH) || (col_width < BED_LENGTH) || (col_high < 15)) no_bed = 1;
-                                else no_bed = 0;
-                                */
-                                //高度在2.4 ~ 2.5 
+                //高度在2.4 ~ 2.5 
                 if (max_hight_now < high_diff_th + 10) {
                     if ((bed_width > (WIDTH_TH + 15)) || (bed_width < WIDTH_TH) || (col_width < BED_LENGTH) || (col_high < 15)) no_bed = 1;
                     else no_bed = 0;
@@ -2911,15 +2918,6 @@ int main(int argc, char* argv[])
                     if ((bed_width > (WIDTH_TH - 5 + 15)) || (bed_width < WIDTH_TH - 5) || (col_width < BED_LENGTH) || (col_high < 15)) no_bed = 1;
                     else no_bed = 0;
                 }
-#ifdef Wayne_debug
-                printf("\n max_hight_now : %d", max_hight_now);
-                printf("\n high_diff_th : %d", high_diff_th);
-                printf("\n  bed_width : %d", bed_width);
-                printf("\n  WIDTH_TH: %d", WIDTH_TH);
-                printf("\n  BED_LENGTH: %d", BED_LENGTH);
-                printf("\n  col_width : %d", col_width);
-                printf("\n  col_high : %d", col_high);
-#endif
                 cout << "The bed width " << bed_width << "The col length " << col_width << " bed high " << col_high << endl;
 
 
@@ -2994,11 +2992,16 @@ int main(int argc, char* argv[])
 #endif
 #endif
                 // 2022 抓錯
+                BedAvgPixel = 0; //20220208
+                int BedPixelCount = 0; //20220208
+
                 if (no_bed == 0) {
                     for (int i = bed_first_line; i < bed_end_line; i++) {
                         line_total_init[i] = 0;
                         line_half_init[i] = 0;
                         for (int j = col_first_line; j < col_end_line; j++) {
+                            BedAvgPixel = BedAvgPixel + grayImage_bed(i, j); // 20220208
+                            BedPixelCount = BedPixelCount + 1;// 20220208
                             line_total_init[i] = line_total_init[i] + grayImage_bed(i, j);
                             if (j < (col_end_line >> 1))
                                 line_half_init[i] = line_half_init[i] + grayImage_bed(i, j);
@@ -3028,6 +3031,7 @@ int main(int argc, char* argv[])
                         //#endif
                     }
                     // ### 2022 Revised #####
+                    if (BedPixelCount != 0) BedAvgPixel = BedAvgPixel / BedPixelCount; //20220208
                         //Up
                     int PreOutSideUpArea = 0;
                     for (int i = 0; i <= bed_first_line; i++) {
@@ -3170,7 +3174,6 @@ int main(int argc, char* argv[])
                         else row_diff = 0;
 
                         int diff_value = 1;
-                        ///
                         if ((row_diff > diff_value) & (i < (bed_end_line - 1))) {
                             zero_count = 0;
                             status_half = 1;
@@ -3222,8 +3225,8 @@ int main(int argc, char* argv[])
                                 line_half_init[i], line_half[i]);
 #endif
                     }
-                    if (countPixel >= 15) bed_obj_status = true; //20220126
-                    else bed_obj_status = false; //20220126
+                    if (countPixel >=BigChangeThresh) bed_obj_change_status = true; //20220208
+                    else bed_obj_change_status = false; //20220126
 
 
                     // if (bed_area.start2_y)
@@ -3240,6 +3243,14 @@ int main(int argc, char* argv[])
                     int bed_area_star_x_tmp = 0;
 
                     int people_col_status = 0;
+                    //20220208
+
+                    StandAroundBed = false;
+                    WholeUpArea = 0;
+                    WholeUpAvgPixel = 0;
+                    WholeDownArea = 0;
+                    WholeDownAvgPixel = 0;
+
                     for (int j = col_first_line; j < col_end_line; j++) {
                         col_total[j] = 0;
                         for (int i = bed_first_line; i < bed_end_line; i++) {
@@ -3302,12 +3313,56 @@ int main(int argc, char* argv[])
 
 
                         }
+//20220208 Start 
+                        //Outside Pixel for UP
+                        if (bed_first_line < 5){
+                            for (int i = 0; i < bed_first_line; i++) {
+                                if (now_image(i, j) < (BedAvgPixel-Standthreshold)) {
+                                    WholeUpAvgPixel = WholeUpAvgPixel + now_image(i, j);
+                                    WholeUpArea = WholeUpArea + 1;
+                                }
+                            }
+                        }
+                        else{
+                            for (int i = bed_first_line - 4; i < bed_first_line; i++){
+                                if (now_image(i, j) < (BedAvgPixel - Standthreshold)) {
+                                    WholeUpAvgPixel = WholeUpAvgPixel + now_image(i, j);
+                                    WholeUpArea = WholeUpArea + 1;
+                                }
+                            }
+                        }
+                        //Outside Pixel for Down
+                        if (bed_end_line > 55) {
+                            for (int i = bed_end_line + 1; i <= 60; i++) {
+                                if (now_image(i, j) <( BedAvgPixel - Standthreshold)) {
+                                    WholeDownAvgPixel = WholeDownAvgPixel + now_image(i, j);
+                                    WholeDownArea = WholeDownArea + 1;
+                                }
+                            }
+                        }
+                        else{
+                            for (int i = bed_end_line + 1; i < bed_end_line +4; i++) {
+                                if (now_image(i, j) < ( BedAvgPixel - Standthreshold)) {
+                                    WholeDownAvgPixel = WholeDownAvgPixel + now_image(i, j);
+                                    WholeDownArea = WholeDownArea + 1;
+                                }
+                            }
+                        }
+
 #ifdef DEBUG_PEOPLE_COL
                         //col_diff
                      //   if (frame_no > 14)
                         printf("$$ The %2d col  %d and diff %d count %d status %d\n", j, col_total[j], col_diff, bed_col_low_count, people_col_status);
 #endif
-                    } //for (int j = col_first_line
+                    } 
+                     //Judge Status Stand Around or not //20220208
+                    if (WholeUpArea != 0) WholeUpAvgPixel = WholeUpAvgPixel / WholeUpArea;
+                    if (WholeDownArea != 0) WholeDownAvgPixel = WholeDownAvgPixel / WholeDownArea;
+                    if ((WholeUpAvgPixel != 0) && (WholeUpArea>StandAreathresh)) StandAroundBed = true;
+                    if ((WholeDownAvgPixel != 0) && (WholeDownArea > StandAreathresh)) StandAroundBed = true;
+#ifdef Wayne_debug
+                    printf("\n UPAvg :  %d  ; DownAvg:  %3d ; BedAvgPixel : %3d ; StandAroundBed : %d  ; UpArea : %d ; DowbArea : %d  ", WholeUpAvgPixel, WholeDownAvgPixel, BedAvgPixel, StandAroundBed, WholeUpArea, WholeDownArea);
+#endif // Wayne_debug
 
 
   ///////////////////////////////////////////////////////轉身和移動 //////////////////////////////////////////////////////////////
@@ -3317,21 +3372,12 @@ int main(int argc, char* argv[])
                     inside_bed_tmp = (no_bed == 0) & (bed_area.start_x != 0) & (bed_area.start_y != 0) & (bed_area.end_x != 0) & (bed_area.end_y != 0);
                     bool now_inside_bed_tmp = ((now_y >= bed_first_line) | (now_y < bed_end_line)) || ((bed_area_pre.area > 250));
                     inside_bed = inside_bed_tmp & (real_bed_mode || now_inside_bed_tmp);// &(people_height < 150);
-#ifdef  Wayne_debug
-                    printf("\n True is %d", (0 < 1));
-                    printf("\n no_bed : %d", no_bed);
-                    printf("\n start_x : %d", bed_area.start_x);
-                    printf("\n start_y : %d", bed_area.start_y);
-                    printf("\n end_x : %d", bed_area.end_x);
-                    printf("\n end_y : %d", bed_area.end_y);
-                    printf("\n real_bed_mode || now_inside_bed_tmp : %d", (real_bed_mode || now_inside_bed_tmp));
-                    printf("\n##############################################");
-#endif                   
+              
                     if (inside_bed) is_inside_bed = 1;
                     else is_inside_bed = 0;
 
                     // cout << "Frame_no " << frame_no << " inside bed " << inside_bed << endl;
-                    if ((inside_bed | lie_down_mode) & bed_obj_status) { //20220126
+                    if ((inside_bed | lie_down_mode) & bed_obj_change_status) { //20220126
                         //detect bed head
                         bed_area.center_high = grayImage_bed(bed_area.center_y, bed_area.center_x);
                         if (bed_area.center_high > bed_high) bed_area.center_high = bed_high;
@@ -3464,7 +3510,7 @@ int main(int argc, char* argv[])
                                 }
                             }
                         }
-                        // ### 2022 START #####
+// ### 2022 START #####
                         int OutSideUpAvgPixel = 0;
                         int OutSideUpArea = 0;
                         int OutSideDownAvgPixel = 0;
@@ -3481,7 +3527,7 @@ int main(int argc, char* argv[])
                                 }
                             }
                             if (OutSideUpArea != 0) OutSideUpAvgPixel = OutSideUpAvgPixel / OutSideUpArea;
-                            if (abs(GroundAvgUpPixel - OutSideUpAvgPixel) > 10)  OutSideUpAreaStatus = true;
+                            if (abs(GroundAvgUpPixel - OutSideUpAvgPixel) > 5)  OutSideUpAreaStatus = true;
                         }
                         // DOWN AREA # >58 : means bed is almost on the down location
                         if (bed_end_line < 57)
@@ -3493,27 +3539,35 @@ int main(int argc, char* argv[])
                                 }
                             }
                             if (OutSideDownArea != 0) OutSideDownAvgPixel = OutSideDownAvgPixel / OutSideDownArea;
-                            if (abs(GroundAvgDownPixel - OutSideDownAvgPixel) > 10)  OutSideDownAreaStatus = true;
+                            if (abs(GroundAvgDownPixel - OutSideDownAvgPixel) > 5)  OutSideDownAreaStatus = true;
                         }
                         // On Edge Status Judge 
-                        if (bed_first_line == bed_area.start_y || bed_end_line == bed_area.end_y + 1) //2022
-                        {
+                        if (bed_first_line == bed_area.start_y) { //20220208
                             EdgeStatus = true;
-                            HumanOnEdgeLineCount++;
+                            HumanOnUpEdgeLineCount++;
                         }
-                        else  //Not in Edge
-                        {
+                        else {//20220208
                             EdgeStatus = false;
-                            HumanOnEdgeLineCount = 0;
+                            HumanOnUpEdgeLineCount = 0;
+                        }
+                        if (bed_end_line == (bed_area.end_y + 1)) { //20220208
+                            EdgeStatus = true;
+                            HumanOnDownEdgeLineCount++;
+                        }
+                        else {  //Not in Edge 20220208
+                            if (!(bed_first_line == bed_area.start_y))
+                            {
+                                EdgeStatus = false;
+                                HumanOnDownEdgeLineCount = 0;
+                            }
+                            else EdgeStatus == true;
                         }
 #ifdef Wayne_debug
                         printf("\nEdgeStatus  : %d", EdgeStatus);
-                        printf("\nHumanOnEdgeLineCount  : %d", HumanOnEdgeLineCount);
-                        printf("\nOutSideUpAreaStatus  : %d", OutSideUpAreaStatus);
-                        printf("\n OutSideDownAreaStatus : %d ", OutSideDownAreaStatus);
-                        printf("\n Diff : %d ", abs(GroundAvgDownPixel - OutSideDownAvgPixel));
+                        printf("\nUP: %3d  ; OutSideUpAreaStatus  : %d", HumanOnUpEdgeLineCount, OutSideUpAreaStatus);
+                        printf("\nDown : %3d  ; OutSideDownAreaStatus : %d ", HumanOnDownEdgeLineCount, OutSideDownAreaStatus);
 #endif
-                        // ### 2022 END #####
+//20220208 End
                         bed_area.hight_div_2 = bed_area.start2_y + ((bed_area.width2_y + 1) >> 1);
                         bed_area.width_div_2 = bed_area.start_x + ((bed_area.width_x + 1) >> 1);
                         int tmp_half_max = bed_area.area_half;
@@ -3530,21 +3584,23 @@ int main(int argc, char* argv[])
                         else inside_bed_pre = 0;
                         //  lie_down_high = 15;
 
-                        if (frame_no > 3) {
+                        if (frame_no > 3 &!StandAroundBed) {
                             int meddle_end_diff = abs(bed_area_start_x - bed_area_high_x);
                             if (
                                 (((bed_area.start_y < (bed_first_line + edge_up_limit)) |
                                     (bed_area.end_y > (bed_end_line - edge_down_limit))))
+                                /* Cancel 2022208
                                 & (bed_area.width_x > 8) & (bed_area.width_y > 5)
                                 & (bed_area.area_high > 18) //& (bed_area.area_high < 120)
                                 & ((bed_area.area - bed_area_pre.area) < 100) & (bed_area.width_y < 19)
                                 & (bed_area.width_x < 27)
                                 & (bed_area.area < 360) & (bed_area.area > 119) //119) 126
+                                */
                               //  & (bed_area.width_x > bed_area.width_y)
                                 & (!lie_down_ready) //& !check_no_lr
-                                & (meddle_end_diff > 2) & (EdgeStatus == true) //2022
-                                & HumanOnEdgeLineCount > 5 //2022
-                                & (OutSideUpAreaStatus == true || OutSideDownAreaStatus == true) //2022
+                                & (meddle_end_diff > 2)
+                                & EdgeStatus
+                                & ((HumanOnUpEdgeLineCount > 5  & OutSideUpAreaStatus )|| (HumanOnDownEdgeLineCount > 5 & OutSideDownAreaStatus )) //20220208
                                 )
                             {
                                 bed_edge = 1;
@@ -3703,6 +3759,8 @@ int main(int argc, char* argv[])
                             leave_bed_real = 1;
                         }
                         bed_edge = 0;
+                        HumanOnUpEdgeLineCount = 0;
+                        HumanOnDownEdgeLineCount = 0;
 
                         if (display_bed_detect == 1) {
 #ifdef LOG_FILE
@@ -4326,7 +4384,7 @@ int main(int argc, char* argv[])
                 /*  if (init_data == 1) sprintf(text_show, "init data ");
                   else
                   */
-                sprintf(text_show, "          ");
+                //sprintf(text_show, "          "); //20220208
                 if (fall_true || trun_lie_down || turn_up_tmp || bed_edge || leave_bed ||
                     no_people_show || have_people_true || other_people_inside_tmp)
                 {
@@ -4365,14 +4423,13 @@ int main(int argc, char* argv[])
                         }
                         else if ((!fall_hold) && trun_lie_down)                     sprintf(text_show, "lie down %d", frame_no);
                         else if ((!fall_hold) && turn_up)                           sprintf(text_show, "Up %d", frame_no);
-                        else if ((!fall_hold) && bed_edge)                          sprintf(text_show, "Edge %d", frame_no);
+                        else if ((!fall_hold) && bed_edge && !StandAroundBed)                          sprintf(text_show, "Edge %d", frame_no); 
                         else if ((!fall_hold) && leave_bed)                         sprintf(text_show, "Leave %d", frame_no);
                         else if ((!fall_hold) && no_people_show)                    sprintf(text_show, "no people %d", frame_no);
-                        else if ((!fall_hold) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_status))) sprintf(text_show, "people %d", frame_no); //20220126 means (not in bed) or (in bed but have a small pixel change)
-                        else if ((!fall_hold) && other_people_inside_tmp)           sprintf(text_show, "other people %d", frame_no);
+                        else if ((!fall_hold) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_change_status))) sprintf(text_show, "people %d", frame_no); //20220126 means (not in bed) or (in bed but have a small pixel change)
+                        else if ((!fall_hold) && other_people_inside_tmp && !StandAroundBed &&(!leave_bed||(leave_bed&&!bed_obj_change_status)))           sprintf(text_show, "other people %d", frame_no); //20220208
                     }
                     else {
-
                         if (fall_true) {
 #ifdef net_udp 
                             rectangle(image_send, temp_r, Scalar(0, 0, 244), 0.8, 1, 0);
@@ -4388,8 +4445,8 @@ int main(int argc, char* argv[])
                         else if ((!fall_hold) && leave_bed)                                 sprintf(text_show, "Leave ");
                         //else if ((!fall_hold) && (no_bed==0) && (frame_no < 5))             sprintf(text_show, "bed ");
                         else if ((!fall_hold) && no_people_show)                            sprintf(text_show, "no people");
-                        else if ((!fall_hold) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_status)))           sprintf(text_show, "people"); //20220126
-                        else if ((!fall_hold) && other_people_inside_tmp)                   sprintf(text_show, "other people");
+                        else if ((!fall_hold) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_change_status)))           sprintf(text_show, "people"); //20220126
+                        else if ((!fall_hold) && other_people_inside_tmp && (!leave_bed || (leave_bed && !bed_obj_change_status)))                   sprintf(text_show, "other people"); //20220208
                     }
                     if (fall_true) {
                         if (XX_rise_yyy < 30) XX_rise_y = (XX_rise_yyy + XX_rise_height + 25);
@@ -4400,7 +4457,7 @@ int main(int argc, char* argv[])
                         else XX_rise_x = 20;
                         putText(C_grayImage_XX_rise, text_show, Point(XX_rise_x, XX_rise_y), FONT_HERSHEY_TRIPLEX, 1.0, Scalar(18, 12, 255), 1, 8);
                     }
-                    else putText(C_grayImage_XX_rise, text_show, Point(100, 40), fontFace, 0.8, cv::Scalar::all(255), thickness, 1);
+                    else if(text_show != NULL) putText(C_grayImage_XX_rise, text_show, Point(100, 40), fontFace, 0.8, cv::Scalar::all(255), thickness, 1); //20220208
 #endif                    
                 } //if (pre_fall | fall_true
 #ifndef net_udp
@@ -4414,7 +4471,7 @@ int main(int argc, char* argv[])
                 else if ((no_bed == 1) && no_people_show)                      grayImage_GIS = imread(String_tmp + "gis_320x240_no_people.jpg", IMREAD_COLOR);
                 else if ((no_bed == 0) && no_people_show)                      grayImage_GIS = imread(String_tmp + "gis_320x240_bed_no_people.jpg", IMREAD_COLOR);
                 else if ((no_bed == 1) && have_people_true)                    grayImage_GIS = imread(String_tmp + "gis_320x240_people.jpg", IMREAD_COLOR);
-                else if ((no_bed == 0) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_status)))     grayImage_GIS = imread(String_tmp + "gis_320x240_bed_people.jpg", IMREAD_COLOR); //20220126
+                else if ((no_bed == 0) && have_people_true && (!inside_bed || (inside_bed && !bed_obj_change_status)))     grayImage_GIS = imread(String_tmp + "gis_320x240_bed_people.jpg", IMREAD_COLOR); //20220126
                 else if (people_have_1)                                      grayImage_GIS = imread(String_tmp + "gis_320x240_people.jpg", IMREAD_COLOR);
                 else  if (frame_no < 4) {
                     if (no_bed == 1)                                           grayImage_GIS = imread(String_tmp + "gis_320x240.jpg", IMREAD_COLOR);
@@ -4556,7 +4613,7 @@ int main(int argc, char* argv[])
 #endif
                     circle(C_grayImage_4X_rise, Point((now_4x), (now_4y)), 1, Scalar(255, 10, 10), 2, 8, 0);
                     ////////////////////////////////////////////////////////////////////////////////////////
-                    if (inside_bed_tmp && bed_obj_status) { //20220126
+                    if (inside_bed_tmp && bed_obj_change_status) { //20220126
                         rectangle(C_grayImage_4X_rise, Point((bed_area.start_x * 4), (bed_area.start_y * 4)), //red line
                             Point((bed_area.end_x * 4), (bed_area.end_y * 4)), Scalar(0, 0, 255), 1, 1, 0);
 
