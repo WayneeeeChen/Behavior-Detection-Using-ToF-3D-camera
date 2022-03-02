@@ -3753,6 +3753,23 @@ int main(int argc, char* argv[])
 
                         } //frame_no < 3
                     } //inside_bed
+
+                    else if ((inside_bed == 1) & !bed_obj_change_status) {//202203
+                        if (StandAroundBed & !other_people_inside) {
+                            if (bed_edge) {
+                                leave_bed = 1;
+                                leave_bed_real = 1;
+                                inside_bed_pre = 0;
+                                lie_down_mode = 0;
+                            }
+                            else if (leave_bed) {
+                                leave_bed = 0;
+                                lie_down_mode = 0;
+                                leave_bed_real = 1;
+                            }
+                            bed_edge = 0;
+                        }
+                    }
                     else {
 
                         if (bed_edge) {
@@ -4519,7 +4536,7 @@ int main(int argc, char* argv[])
                         else if ((!fall_hold) && trun_lie_down)                             sprintf(text_show, "lie down ");
                         //else if ((!fall_hold) && inside_bed)                                sprintf(text_show, "On Bed ");
                         else if ((!fall_hold) && turn_up)                                   sprintf(text_show, "Up ");
-                        else if ((!fall_hold) && bed_edge)                                  sprintf(text_show, "Edge ");
+                        else if ((!fall_hold) && bed_edge && !StandAroundBed)                                  sprintf(text_show, "Edge ");
                         else if ((!fall_hold) && leave_bed)                                 sprintf(text_show, "Leave ");
                         //else if ((!fall_hold) && (no_bed==0) && (frame_no < 5))             sprintf(text_show, "bed ");
                         else if ((!fall_hold) && no_people_show)                            sprintf(text_show, "no people");
